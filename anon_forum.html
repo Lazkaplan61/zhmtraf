@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Anon Forum - Taslak</title>
+  <title>Anon Forum – Canlı</title>
   <style>
     :root{--bg:#0f1724;--card:#0b1220;--accent:#6ee7b7;--muted:#94a3b8}
     html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;background:linear-gradient(180deg,#031027 0%, #071122 100%);color:#e6eef8}
@@ -32,13 +32,13 @@
 <body>
   <div class="wrap">
     <header>
-      <h1>Anon Forum — Taslak</h1>
-      <div class="small">Tamamen anonim demo. Gerçek yayına almadan önce moderasyon & hukuki kontrolleri unutmayın ⚖️</div>
+      <h1>Anon Forum — Canlı</h1>
+      <div class="small">Anonim kullanıcılar için forum demo. Moderasyon gereklidir.</div>
     </header>
 
     <section class="card" id="newThreadCard">
       <div style="display:flex;gap:10px;align-items:center;">
-        <input id="displayName" placeholder="İsim (opsiyonel) - default: Anon" style="flex:1" />
+        <input id="displayName" placeholder="İsim (opsiyonel) – default: Anon" style="flex:1" />
         <select id="boardSelect" title="Board">
           <option value="genel">#genel</option>
           <option value="sorular">#sorular</option>
@@ -46,16 +46,12 @@
         </select>
       </div>
       <div style="margin-top:10px">
-        <textarea id="threadContent" placeholder="Yeni başlık + içerik yazın..."></textarea>
+        <textarea id="threadContent" placeholder="Yeni başlık + içerik yazın…"></textarea>
       </div>
       <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
         <button id="createThreadBtn">Gönder (Anonim)</button>
-        <button id="exportBtn" class="small">JSON olarak indir</button>
-        <button id="importBtn" class="small">JSON yükle</button>
-        <input id="fileInput" type="file" accept="application/json" style="display:none" />
-        <input id="moderatorPass" placeholder="Mod şifresi (yerel)" style="width:180px" />
         <div class="utils" style="margin-left:auto">
-          <input id="search" class="search" placeholder="Ara..." />
+          <input id="search" class="search" placeholder="Ara…" />
         </div>
       </div>
     </section>
@@ -66,154 +62,147 @@
     </section>
 
     <footer>
-      Bu taslak: statik olarak çalışır (LocalStorage). Canlı forum için: backend (DB), moderation, rate-limiting, spam-filtreleme ve hukuki uyumluluk gerekir. İstersen bunları da kurmana yardımcı olurum 🙂
+      Bu sistem canlı: backend + veritabanı ile çalışır. Güvenlik, moderasyon, spam‑filtreleme eklenmelidir.
     </footer>
   </div>
 
-  <script>
-    // Basit, tek dosyalık anonim forum taslağı.
-    // NOT: Bu demo **yalnızca** küçük testler/öğrenme amaçlıdır.
+<script>
+  const API_BASE = (location.origin.includes('localhost') ? 'http://localhost:3000' : location.origin);
+  const threadsEl = document.getElementById('threads');
+  const createBtn = document.getElementById('createThreadBtn');
+  const displayNameInput = document.getElementById('displayName');
+  const contentInput = document.getElementById('threadContent');
+  const boardSelect = document.getElementById('boardSelect');
+  const searchInput = document.getElementById('search');
 
-    const STORAGE_KEY = 'anon_forum_posts_v1';
-    const threadsEl = document.getElementById('threads');
-    const createBtn = document.getElementById('createThreadBtn');
-    const displayNameInput = document.getElementById('displayName');
-    const contentInput = document.getElementById('threadContent');
-    const boardSelect = document.getElementById('boardSelect');
-    const searchInput = document.getElementById('search');
-    const exportBtn = document.getElementById('exportBtn');
-    const importBtn = document.getElementById('importBtn');
-    const fileInput = document.getElementById('fileInput');
-    const modPassInput = document.getElementById('moderatorPass');
+  let posts = [];
 
-    let posts = load();
-    render();
-
-    function load(){
-      try{
-        return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-      }catch(e){return []}
+  async function fetchPosts(){
+    try {
+      const res = await fetch(`${API_BASE}/api/posts`);
+      posts = await res.json();
+      render(searchInput.value);
+    } catch(err){
+      console.error('Gönderi alınamadı:', err);
+      threadsEl.innerHTML = '<div class="small">Veriler alınamadı. Sunucu çevrimdışı olabilir.</div>';
     }
-    function save(){
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(posts));
-    }
+  }
 
-    createBtn.addEventListener('click', ()=>{
-      const text = contentInput.value.trim();
-      if(!text) return alert('İçerik boş olamaz');
-      const p = {
-        id: Date.now() + Math.random().toString(36).slice(2,8),
-        board: boardSelect.value,
-        name: displayNameInput.value.trim() || 'Anon',
-        content: text,
-        createdAt: new Date().toISOString(),
-        replies: []
-      };
-      posts.unshift(p);
-      save();
-      contentInput.value='';
-      displayNameInput.value='';
-      render();
+  createBtn.addEventListener('click', async () => {
+    const text = contentInput.value.trim();
+    if (!text) return alert('İçerik boş olamaz');
+    const newPost = {
+      id: Date.now().toString() + Math.random().toString(36).slice(2,8),
+      board: boardSelect.value,
+      name: displayNameInput.value.trim() || 'Anon',
+      content: text,
+      createdAt: new Date().toISOString()
+    };
+    await fetch(`${API_BASE}/api/posts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newPost)
     });
+    contentInput.value = '';
+    displayNameInput.value = '';
+    await fetchPosts();
+  });
 
-    function render(filter=''){
-      threadsEl.innerHTML='';
-      const list = posts.filter(t => !filter || (t.content+t.name+t.board).toLowerCase().includes(filter.toLowerCase()));
-      if(list.length===0){ threadsEl.innerHTML = '<div class="small">Henüz içerik yok. İlk başlığı sen aç!</div>'; return }
-      for(const t of list){
-        const div = document.createElement('div'); div.className='thread';
-        div.innerHTML = `
-          <div style="display:flex;align-items:center">
-            <div>
-              <strong>${escapeHtml(t.name)}</strong> <span class="small">in #${escapeHtml(t.board)}</span>
-              <div class="meta">${new Date(t.createdAt).toLocaleString()}</div>
-            </div>
-            <div class="controls">
-              <button data-id="${t.id}" class="replyBtn small">Cevapla</button>
-              <button data-id="${t.id}" class="reportBtn small">Şikayet</button>
-              <button data-id="${t.id}" class="delBtn small danger">Sil</button>
-            </div>
-          </div>
-          <div class="post">${nl2br(escapeHtml(t.content))}</div>
-          <div class="small" style="margin-top:8px">Cevaplar: ${t.replies.length}</div>
-          <div class="replies" style="margin-top:8px"></div>
-        `;
-        threadsEl.appendChild(div);
-        const replyArea = div.querySelector('.replies');
-        const form = document.createElement('div'); form.style.marginTop='6px';
-        form.innerHTML = `
-          <textarea placeholder="Cevabınızı yazın" data-id="${t.id}" style="width:100%;min-height:40px;border-radius:6px;padding:6px;margin-top:6px"></textarea>
-          <div style="display:flex;gap:6px;margin-top:6px">
-            <input placeholder="İsim (ops.)" data-name="${t.id}" style="flex:1" />
-            <button data-post="${t.id}" class="postReplyBtn">Gönder</button>
-          </div>
-        `;
-        replyArea.appendChild(form);
+  searchInput.addEventListener('input', e => render(e.target.value));
 
-        const repliesList = document.createElement('div');
-        for(const r of t.replies){
-          const rdiv = document.createElement('div'); rdiv.className='post';
-          rdiv.style.marginTop='8px';
+  function render(filter=''){
+    threadsEl.innerHTML = '';
+    const list = posts.filter(t => !filter || (t.content + t.name + t.board).toLowerCase().includes(filter.toLowerCase()));
+    if (list.length === 0) {
+      threadsEl.innerHTML = '<div class="small">Henüz içerik yok ya da filtreye uygun içerik bulunamadı.</div>';
+      return;
+    }
+    for (const t of list) {
+      const div = document.createElement('div');
+      div.className = 'thread';
+      div.innerHTML = `
+        <div style="display:flex;align-items:center">
+          <div>
+            <strong>${escapeHtml(t.name)}</strong> <span class="small">in #${escapeHtml(t.board)}</span>
+            <div class="meta">${new Date(t.createdAt).toLocaleString()}</div>
+          </div>
+          <div class="controls">
+            <button data-id="${t.id}" class="replyBtn small">Cevapla</button>
+            <button data-id="${t.id}" class="reportBtn small">Şikayet</button>
+          </div>
+        </div>
+        <div class="post">${nl2br(escapeHtml(t.content))}</div>
+        <div class="small" style="margin-top:8px">Cevaplar: ${t.replies ? t.replies.length : 0}</div>
+        <div class="replies" style="margin-top:8px"></div>
+      `;
+      threadsEl.appendChild(div);
+      const replyArea = div.querySelector('.replies');
+      const form = document.createElement('div');
+      form.style.marginTop = '6px';
+      form.innerHTML = `
+        <textarea placeholder="Cevabınızı yazın" data-id="${t.id}" style="width:100%;min-height:40px;border-radius:6px;padding:6px;margin-top:6px"></textarea>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <input placeholder="İsim (ops.)" data-name="${t.id}" style="flex:1" />
+          <button data-post="${t.id}" class="postReplyBtn">Gönder</button>
+        </div>
+      `;
+      replyArea.appendChild(form);
+      const repliesList = document.createElement('div');
+      if (t.replies) {
+        for (const r of t.replies) {
+          const rdiv = document.createElement('div');
+          rdiv.className = 'post';
+          rdiv.style.marginTop = '8px';
           rdiv.innerHTML = `<strong>${escapeHtml(r.name)}</strong> <span class="small">${new Date(r.createdAt).toLocaleString()}</span><div style="margin-top:6px">${nl2br(escapeHtml(r.content))}</div>`;
           repliesList.appendChild(rdiv);
         }
-        replyArea.appendChild(repliesList);
-
       }
-      attachHandlers();
+      replyArea.appendChild(repliesList);
     }
+    attachHandlers();
+  }
 
-    function attachHandlers(){
-      document.querySelectorAll('.postReplyBtn').forEach(btn => btn.onclick = e => {
-        const id = e.target.dataset.post;
-        const ta = document.querySelector(`textarea[data-id="${id}"]`);
-        const nameInput = document.querySelector(`input[data-name="${id}"]`);
-        const txt = ta.value.trim(); if(!txt) return alert('Boş cevap olmaz');
-        const r = {id:Date.now(), name: nameInput.value.trim()||'Anon', content: txt, createdAt:new Date().toISOString()};
-        const thread = posts.find(p=>p.id==id);
-        thread.replies.push(r);
-        save(); render(searchInput.value);
+  function attachHandlers(){
+    document.querySelectorAll('.postReplyBtn').forEach(btn => btn.onclick = async e => {
+      const id = e.target.dataset.post;
+      const ta = document.querySelector(`textarea[data-id="${id}"]`);
+      const nameInput = document.querySelector(`input[data-name="${id}"]`);
+      const txt = ta.value.trim(); if (!txt) return alert('Boş cevap olmaz');
+      const replyObj = {
+        id: Date.now().toString() + Math.random().toString(36).slice(2,8),
+        postId: id,
+        name: nameInput.value.trim() || 'Anon',
+        content: txt,
+        createdAt: new Date().toISOString()
+      };
+      await fetch(`${API_BASE}/api/replies`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(replyObj)
       });
-
-      document.querySelectorAll('.delBtn').forEach(b=>b.onclick = e => {
-        const id = e.target.dataset.id;
-        const pass = modPassInput.value || prompt('Mod şifresini gir (demo için local):');
-        if(!pass) return;
-        // demo: şifre 'moderator' ile silme izni veriyoruz — canlı sistemde sunucu kontrolü gerekir
-        if(pass !== 'moderator') return alert('Yanlış şifre (demo)');
-        posts = posts.filter(p => p.id !== id);
-        save(); render(searchInput.value);
-      });
-
-      document.querySelectorAll('.replyBtn').forEach(b=>b.onclick = e => {
-        const id = e.target.dataset.id;
-        const ta = document.querySelector(`textarea[data-id="${id}"]`);
-        if(ta){ ta.focus(); ta.scrollIntoView({behavior:'smooth', block:'center'}); }
-      });
-
-      document.querySelectorAll('.reportBtn').forEach(b=>b.onclick = e => {
-        alert('Şikayet alındı — demo. Gerçek sistemde backend'e POST atılmalı.');
-      });
-    }
-
-    searchInput.addEventListener('input', e => render(e.target.value));
-
-    exportBtn.addEventListener('click', ()=>{
-      const blob = new Blob([JSON.stringify(posts, null, 2)], {type:'application/json'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href=url; a.download='anon_forum_export.json'; a.click(); URL.revokeObjectURL(url);
+      await fetchPosts();
     });
-    importBtn.addEventListener('click', ()=> fileInput.click());
-    fileInput.addEventListener('change', e => {
-      const f = e.target.files[0]; if(!f) return;
-      const reader = new FileReader();
-      reader.onload = ev => { try{ posts = JSON.parse(ev.target.result); save(); render(); alert('İçerik yüklendi') }catch(err){alert('Geçersiz JSON')}};
-      reader.readAsText(f);
+    document.querySelectorAll('.reportBtn').forEach(b => b.onclick = async e => {
+      const id = e.target.dataset.id;
+      await fetch(`${API_BASE}/api/report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId: id, board: 'report' })
+      });
+      alert('Şikayet gönderildi. Moderatör kontrol edilecek.');
     });
+    document.querySelectorAll('.replyBtn').forEach(b => b.onclick = e => {
+      const id = e.target.dataset.id;
+      const ta = document.querySelector(`textarea[data-id="${id}"]`);
+      if (ta) { ta.focus(); ta.scrollIntoView({behavior:'smooth', block:'center'}); }
+    });
+  }
 
-    // Basit yardımcılar
-    function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
-    function nl2br(s){ return String(s).replace(/\n/g,'<br/>') }
-  </script>
+  function escapeHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function nl2br(s) { return String(s).replace(/\n/g, '<br/>'); }
+
+  // İlk veri çekimi
+  fetchPosts();
+</script>
 </body>
 </html>
